@@ -3,7 +3,7 @@ name: system-swarm-review
 description: >
   This skill should be used when the user asks to "run a system review",
   "do a full audit", "swarm review", "run the review agents", or "audit
-  this project". Deploys a configurable swarm of up to 10 specialized
+  this project". Deploys a configurable swarm of up to 11 specialized
   agents that review a codebase in parallel through distinct lenses. Do
   NOT trigger for single-topic questions like "check my security".
 context: fork
@@ -14,42 +14,44 @@ argument-hint: "[project path or description]"
 
 Deploys a configurable swarm of specialized review agents against any software
 project. Each agent examines the product through a distinct lens -- user experience,
-security, performance, accessibility, code quality, mobile, and product strategy.
-Findings are grounded in the actual codebase, not generic checklists.
+security, performance, accessibility, code quality, standards compliance, mobile,
+and product strategy. Findings are grounded in the actual codebase, not generic
+checklists.
 
-All agents are optional. The user selects which to run at the confirmation
-checkpoint before anything executes.
+All agents are optional. The user selects which to run and chooses the run mode
+(sub-agents or agent team) at the confirmation checkpoint.
 
 ---
 
 ## The Agent Roster
 
-Ten specialized agents are available. Read references/agent-roster.md for the
-full definition of each agent's scope, focus areas, and output format.
+Eleven specialized agents are available. Read references/agent-roster.md for
+full definitions of each agent's scope, focus areas, and output format.
 
 User Perspective Agents (simulate real users moving through the product):
 
 | Agent | Focus |
 |---|---|
-| Andy (Newcomer) | First impressions, onboarding confusion, jargon, missing context |
-| Ellis (Pressured) | High-stakes flows, error states, what breaks under time pressure |
-| Brooks (Expert) | Missing depth, black-box logic, power features, precision gaps |
-| Jake (Edge Case) | Non-standard use cases, gaps the product didn't plan for |
+| Newcomer | First impressions, onboarding confusion, jargon, missing context |
+| Pressured User | High-stakes flows, error states, what breaks under time pressure |
+| Expert User | Missing depth, black-box logic, power features, precision gaps |
+| Edge Case User | Non-standard use cases, gaps the product didn't plan for |
 
-Specialist Agents (examine the system itself):
+Specialist Agents (examine the system directly):
 
 | Agent | Focus |
 |---|---|
-| Red (Security) | Auth, permissions, exposed secrets, injection vectors, RLS |
-| Heywood (Mobile) | Responsive layout, touch targets, mobile-only flows, viewport issues |
-| Tommy (Performance) | Load times, query count, bundle size, render blocking, waterfalls |
-| Norton (Accessibility) | WCAG 2.1 AA, keyboard nav, color contrast, screen reader paths |
-| Hadley (Code Quality) | Tech debt, missing error handling, hardcoded values, test coverage |
-| Skeet (Product Strategy) | Competitive gaps, missing features, growth opportunities, business model |
+| Security | Auth, permissions, exposed secrets, injection vectors, RLS |
+| Mobile | Responsive layout, touch targets, mobile-only flows, viewport issues |
+| Performance | Load times, query count, bundle size, render blocking, waterfalls |
+| Accessibility | WCAG 2.1 AA, keyboard nav, color contrast, screen reader paths |
+| Code Quality | Tech debt, missing error handling, hardcoded values, test coverage |
+| Standards | Anthropic best practices, framework conventions, dependency hygiene |
+| Product Strategy | Competitive gaps, missing features, growth opportunities |
 
-Defaults (on unless toggled off): Andy, Ellis, Brooks, Jake, Red, Tommy
+Defaults (on unless toggled off): Newcomer, Pressured User, Expert User, Edge Case User, Security, Performance, Standards
 
-Optional (off by default): Heywood, Norton, Hadley, Skeet
+Optional (off by default): Mobile, Accessibility, Code Quality, Product Strategy
 
 ---
 
@@ -76,18 +78,17 @@ Build a project brief covering:
 - What it does and who it's for (one sentence each)
 - Tech stack (frontend, backend, database, AI/external services)
 - Core user flows (the paths that matter)
-- Immediate red flags from code reading (TODOs, disabled auth, exposed keys,
-  console.logs, hardcoded values, missing error handlers)
+- Immediate red flags from code reading
 
 Read references/walkthrough-guide.md to determine appropriate walkthrough steps
-for the user-perspective agents based on product type.
+based on product type.
 
 Write the brief to disk before proceeding. Sub-agents have no access to the
 parent context window -- everything they need must be in a file.
 
   mkdir -p .claude/swarm-review
 
-Write to .claude/swarm-review/project-brief.md. Also copy the synthesis template:
+Write to .claude/swarm-review/project-brief.md.
 
 Read references/synthesis-template.md from the skill directory and write its
 contents to .claude/swarm-review/synthesis-template.md.
@@ -100,16 +101,11 @@ Do not proceed until both files are written.
 
 Using the project brief, generate the review plan. Do not show the user yet.
 
-For user-perspective agents (Andy, Ellis, Brooks, Jake):
-Generate 5-7 walkthrough steps grounded in actual screens from the codebase.
-Read references/agent-roster.md for how to adapt each persona's archetype
-to this specific product type.
+For user-perspective agents: Generate 5-7 walkthrough steps grounded in actual
+screens from the codebase.
 
-For specialist agents (Red, Heywood, Tommy, Norton, Hadley, Skeet):
-Identify 3-5 specific areas of the codebase each specialist should focus on,
-based on what was found during discovery. Vague focus areas produce vague output --
-be specific: "Red should focus on the JWT validation in /api/auth, the Supabase
-RLS policies, and the user input flowing into the AI prompt in /api/chat."
+For specialist agents: Identify 3-5 specific areas of the codebase each should
+focus on. Be specific -- vague focus areas produce vague output.
 
 Add all agent configurations to .claude/swarm-review/project-brief.md.
 
@@ -117,92 +113,133 @@ Add all agent configurations to .claude/swarm-review/project-brief.md.
 
 ## Phase 3 -- Confirmation Checkpoint
 
-Present the plan and let the user toggle agents. This is a conversational pause.
-Do not spawn anything until the user replies.
-
-Present it in this format -- show current on/off state clearly:
+Present the plan and let the user toggle agents and choose run mode.
 
   PROJECT: [Product Name] -- [one-line description]
 
   AGENTS READY TO DEPLOY:
 
   User Perspective (simulating real users):
-    [ON]  Andy (Newcomer)    -- first impressions, onboarding, jargon
-    [ON]  Ellis (Pressured)  -- high-stakes flows, errors, time pressure
-    [ON]  Brooks (Expert)    -- missing depth, power features, precision
-    [ON]  Jake (Edge Case)   -- non-standard use cases, planning gaps
+    [ON]  Newcomer        -- first impressions, onboarding, jargon
+    [ON]  Pressured User  -- high-stakes flows, errors, time pressure
+    [ON]  Expert User     -- missing depth, power features, precision
+    [ON]  Edge Case User  -- non-standard use cases, planning gaps
 
   Specialist Review:
-    [ON]  Red (Security)        -- auth, secrets, injection, permissions
-    [OFF] Heywood (Mobile)      -- responsive layout, touch, mobile flows
-    [ON]  Tommy (Performance)   -- load times, queries, bundle, rendering
-    [OFF] Norton (Accessibility)-- WCAG, keyboard nav, contrast
-    [OFF] Hadley (Code Quality) -- debt, error handling, test coverage
-    [OFF] Skeet (Product Strategy) -- gaps, growth, competitive positioning
+    [ON]  Security           -- auth, secrets, injection, permissions
+    [OFF] Mobile             -- responsive layout, touch, mobile flows
+    [ON]  Performance        -- load times, queries, bundle, rendering
+    [OFF] Accessibility      -- WCAG, keyboard nav, contrast
+    [OFF] Code Quality       -- debt, error handling, test coverage
+    [ON]  Standards          -- best practices, conventions, dependencies
+    [OFF] Product Strategy   -- gaps, growth, competitive positioning
 
   WALKTHROUGH: [N] steps -- [brief description of flow]
 
-  Toggle any agents on/off, or say "run it" to proceed with defaults.
+  RUN MODE:
+    [SUB-AGENTS] Parallel, isolated context, standard token cost (default)
+    [AGENT TEAM]  Collaborative, shared context, ~7x token cost
 
-Wait for user reply. Apply changes to the brief file, then proceed to Phase 4.
+  Toggle agents on/off, change run mode, or say "run it" to proceed.
+
+Wait for user reply. Apply changes, then proceed to Phase 4.
 
 ---
 
 ## Phase 4 -- Parallel Agent Deployment
 
+If sub-agents mode (default):
 Spawn all active agents simultaneously using the Agent tool -- all in one response.
-Do not run sequentially.
 
-Each Agent prompt must include:
+If agent team mode:
+Create a team with each active agent as a teammate. Use natural language to
+describe each teammate's role and assign their focus areas. The team will
+coordinate and build on each other's findings.
+
+Each agent prompt must include:
 1. Path to project brief: .claude/swarm-review/project-brief.md
 2. The agent's specific focus areas from Phase 2
 3. The output file path for that agent's report
-4. Reporting instructions from references/agent-roster.md for that agent type
+4. Reporting instructions from references/agent-roster.md
 
 Output paths:
-  .claude/swarm-review/andy.md
-  .claude/swarm-review/ellis.md
-  .claude/swarm-review/brooks.md
-  .claude/swarm-review/jake.md
-  .claude/swarm-review/red.md
-  .claude/swarm-review/heywood.md
-  .claude/swarm-review/tommy.md
-  .claude/swarm-review/norton.md
-  .claude/swarm-review/hadley.md
-  .claude/swarm-review/skeet.md
+  .claude/swarm-review/newcomer.md
+  .claude/swarm-review/pressured-user.md
+  .claude/swarm-review/expert-user.md
+  .claude/swarm-review/edge-case-user.md
+  .claude/swarm-review/security.md
+  .claude/swarm-review/mobile.md
+  .claude/swarm-review/performance.md
+  .claude/swarm-review/accessibility.md
+  .claude/swarm-review/code-quality.md
+  .claude/swarm-review/standards.md
+  .claude/swarm-review/product-strategy.md
 
-Only spawn agents that are toggled ON. Skip files for agents that were toggled OFF.
-
-Wait for all active agents to complete before proceeding to Phase 5.
+Wait for all agents to complete before Phase 5.
 
 ---
 
-## Phase 5 -- Synthesis
+## Phase 5 -- Synthesis + Swarm.Sync.md
 
-After all agents finish, the parent agent (not a sub-agent) spawns one synthesis
-agent. Sub-agents cannot spawn sub-agents -- synthesis is always the parent's job.
+After all agents finish, spawn one synthesis agent (from the parent, not a sub-agent).
 
-Before spawning, verify all active agent output files exist.
+Synthesis agent reads all output files + the synthesis template, then writes:
+1. .claude/swarm-review/[YYYYMMDD-HHMM]-synthesis.md -- timestamped report
+2. .claude/swarm-review/Swarm.Sync.md -- persistent file updated each run
 
-Synthesis Agent prompt:
+Swarm.Sync.md format:
 
-  You are synthesizing results from a multi-agent system review.
+  # Swarm Sync -- [Product Name]
 
-  Read these files in order:
-  1. .claude/swarm-review/project-brief.md
-  2. [each active agent output file]
-  3. .claude/swarm-review/synthesis-template.md (required output structure)
+  Last run: [date]
+  Agents: [list]
+  Run mode: [sub-agents / agent team]
 
-  Write the completed synthesis to:
-  .claude/swarm-review/[YYYYMMDD-HHMM]-synthesis.md
+  ## Finding Tally
 
-  Follow the template exactly. Every section is required.
-  Validate before finalizing:
-  - All CRITICAL findings from any agent appear in the synthesis
-  - Cross-agent patterns are documented with agent attribution
-  - Top 10 list is ranked by real impact, not by agent order
-  - The one-sentence summary is honest -- not a marketing tagline
-  - No finding was invented that isn't in the source reports
+  | Finding | Agents Who Flagged It | Count | Severity |
+  |---------|----------------------|-------|----------|
+  | [finding] | [agent names] | [N] | [level] |
+
+  ## Top 10 Actions (UX-Weighted)
+
+  UX is the primary evaluation pillar. At least 4 of the top 10 should be UX
+  findings unless genuinely no UX issues were found. All pillars matter.
+
+  | Rank | Action | Type | Agent(s) | Why This Rank |
+  |------|--------|------|----------|--------------|
+  | 1 | ... | ... | ... | ... |
+
+  ## User Decision Log
+
+  [Empty until user provides feedback. After user reviews:]
+
+  | Finding | Decision | Notes |
+  |---------|----------|-------|
+  | [finding] | IMPLEMENT / CHANGE / REMOVE / DEFER | [user's notes] |
+
+  ## Previous Runs
+  - [date]: [N] agents, [summary of key findings]
+
+---
+
+## Phase 6 -- User Review + Project File Updates
+
+After presenting the synthesis, ask the user:
+
+  "Review the findings above. For each suggestion, tell me:
+  - Implement: add to the todo as-is
+  - Change: implement with modifications (describe what to change)
+  - Remove: don't implement
+  - Defer: add to long-term/backlog
+
+  I'll update your todo and PRD based on your decisions."
+
+After the user responds:
+1. Update Swarm.Sync.md User Decision Log with their choices
+2. Read the project's [slug]-todo.json and add IMPLEMENT/CHANGE items
+3. Read the project's [slug]-prd.md and update relevant sections
+4. Inform the user: "Todo and PRD updated. Say 'sync' to refresh the HTML tracker."
 
 ---
 
@@ -210,32 +247,35 @@ Synthesis Agent prompt:
 
 Confirm all file paths to the user:
 
-  Review complete. [N] agents ran. Files written to .claude/swarm-review/
+  Review complete. [N] agents ran ([mode]). Files:
 
-  Agent reports:   [list only the ones that ran]
+  Agent reports:   .claude/swarm-review/[agent-name].md (for each)
   Synthesis:       .claude/swarm-review/[timestamp]-synthesis.md
+  Swarm Sync:      .claude/swarm-review/Swarm.Sync.md
 
-Give a brief verbal summary of the top 5 findings across all agents.
+  Review the findings and tell me what to implement, change, remove, or defer.
+
+Give a brief verbal summary of the top 5 findings.
 
 ---
 
 ## Gotchas
 
 - Context isolation: Sub-agents start fresh. Everything they need must be in the
-  project brief file. Never assume a sub-agent knows anything from the conversation.
+  project brief file.
 
 - Synthesis timing: Spawn synthesis only after all agent output files exist.
-  Check with: ls .claude/swarm-review/ before spawning.
 
-- Sub-agents cannot spawn sub-agents: Synthesis is always the parent's job,
-  called after the swarm completes -- not inside any agent call.
+- Sub-agents cannot spawn sub-agents: Synthesis is always the parent's job.
 
-- Specialist scope drift: Red should not comment on UX. Tommy should not audit
-  auth. Each agent stays in its lane. The synthesis is where patterns cross.
+- Specialist scope drift: Each agent stays in its lane. The synthesis is where
+  patterns cross.
 
 - Generic findings: "The code could be better organized" is not a finding.
-  "The student.py file is 3,200 lines with no router separation -- breaking it into
-  feature routers would halve debugging time" is a finding.
+  Every finding must reference a specific file, component, or behavior.
 
-- Positive washing: If something is genuinely broken, say so. The goal is
-  actionable intelligence, not a report that makes the developer feel good.
+- Positive washing: If something is broken, say so. The goal is actionable
+  intelligence.
+
+- Agent teams cost ~7x more tokens: Only recommend when the user explicitly
+  wants collaborative review or the project is large enough to benefit.

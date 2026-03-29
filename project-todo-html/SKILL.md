@@ -4,42 +4,50 @@ description: >
   This skill should be used ONLY when the user explicitly asks to "generate
   todo", "create a todo", "master todo", "task tracker", "build me a tracker",
   or "what's left to build" as a FILE for a specific named project. Outputs a
-  JSON source of truth and an HTML visual tracker. Do NOT trigger for general
-  planning questions or casual "what should I do?" questions.
+  JSON todo, a PRD markdown file, and an HTML tracker with toggle between views.
+  Do NOT trigger for general planning questions or casual "what should I do?"
 argument-hint: "[project name]"
 ---
 
-# Project Master To-Do HTML Generator
+# Project Tracker Generator
 
-Generates a two-file task tracking system for any project:
-- [slug]-todo.json -- machine-readable source of truth; agents read and write this
-- [slug]-todo.html -- human-readable interactive tracker; generated from the JSON
+Generates a three-file project tracking system:
+- [slug]-todo.json -- machine-readable task list; agents read and write this
+- [slug]-prd.md -- product requirements document; agents update as decisions are made
+- [slug]-tracker.html -- interactive tracker with toggle between Todo and PRD views
 
-Agents update the JSON. The HTML is only regenerated when the user asks, or when
-the skill detects enough changes have accumulated to make regeneration worthwhile.
+The JSON and PRD are living documents. Agents update them between sessions.
+The HTML is a snapshot -- only regenerated when the user asks to "sync" or "update".
+Updating either view triggers both to sync.
 
 ---
 
-## File Architecture
+## Three-File Architecture
 
-Agents interact with the JSON. Humans interact with the HTML.
+Agents interact with the JSON and PRD. Humans interact with the HTML.
 
-The JSON is the authoritative state. It contains all items, their done/not-done
-status, badge assignments, section membership, and a change counter that tracks
-how many updates have happened since the HTML was last regenerated.
+Todo JSON ([slug]-todo.json): Task tracking source of truth. Contains all items,
+done/not-done status, badges, sections, and a change counter.
 
-The HTML reads nothing from disk -- all data is embedded at generation time. When
-an agent updates the JSON and the user opens the HTML, they see the old state.
-When the HTML is regenerated from the updated JSON, they see the new state.
+PRD ([slug]-prd.md): Product requirements document. Contains vision, users,
+features, tech stack, architecture decisions, and a session handoff block. Agents
+update this as requirements evolve and decisions are made.
+
+HTML Tracker ([slug]-tracker.html): Visual interface with a toggle at the top
+to switch between Todo view (default) and PRD view. All data is embedded at
+generation time -- no file fetches. Only regenerated on user request.
 
 This split means:
-- Agents can update the todo list mid-session without touching the HTML
-- The HTML never breaks because of an agent's half-written update
-- State is preserved across regenerations via localStorage in the browser
+- Agents can update todo items and PRD content without touching the HTML
+- New agents read the JSON + PRD to get full project context instantly
+- The HTML never breaks from partial agent updates
+- State is preserved across regenerations via localStorage
 
 ---
 
 ## JSON Schema
+
+Same schema as before -- see the existing JSON Schema section. No changes needed.
 
 {
   "project": "CampusNova",
@@ -82,7 +90,46 @@ Section IDs are always: critical, active, polish, longterm
 
 ---
 
-## Agent Instructions -- Reading and Writing the JSON
+## PRD Format
+
+The PRD is a markdown file with this structure:
+
+# [Project Name] -- Product Requirements Document
+
+> Session Handoff (read this first):
+> [5-line summary of current state, what was just completed, what's next,
+> any blockers, and key decisions made. Updated by agents after each session.]
+
+## Vision
+[One paragraph -- what this product does and why it matters]
+
+## Target Users
+[Who uses this and in what context -- be specific]
+
+## Core Features (Current State)
+[What exists and works today -- bullet list with status indicators]
+
+## Planned Features
+[What's coming -- derived from todo items, grouped by priority]
+
+## Tech Stack
+[Frontend, backend, database, AI/external services, deployment]
+
+## Architecture Decisions
+[Key decisions made and WHY -- agents append here as decisions happen]
+- [date]: [decision] -- [rationale]
+
+## Current Status
+[Phase: MVP / Beta / Production / etc.]
+[Last updated: date]
+[Open blockers: list or "none"]
+
+---
+
+## Agent Instructions -- Updating the JSON
+
+Same as before: use the Read tool (not cat) to read the JSON. Mark items done,
+add new items, reprioritize -- all by reading and writing the JSON file.
 
 When another agent needs to understand project state:
   Read the [slug]-todo.json file using the Read tool.
@@ -111,35 +158,57 @@ When an agent wants to reprioritize (move item between sections):
 2. Remove item from current section, add to target section
 3. Increment changes_since_html by 1, update timestamps, write back
 
-When changes_since_html reaches 5 or more, ask the user:
-  "I've made [N] changes to the todo list since the HTML was last generated.
-  Want me to regenerate it now so you can see the updated view?"
+When changes_since_html reaches 5 or more, inform the user:
+  "I've made [N] changes to the project files since the HTML was last generated.
+  Say 'sync' when you want to see the updated tracker."
 
-Only regenerate the HTML if the user says yes, or if they explicitly ask.
+Only regenerate the HTML if the user explicitly asks.
+
+---
+
+## Agent Instructions -- Updating the PRD
+
+When an agent makes a significant decision or discovers new requirements:
+
+1. Read [slug]-prd.md
+2. Update the relevant section:
+   - New feature discovered: add to "Planned Features"
+   - Architecture decision made: append to "Architecture Decisions" with date
+   - Feature completed: move from "Planned" to "Core Features (Current State)"
+   - Blocker found: update "Current Status"
+3. ALWAYS update the "Session Handoff" block at the top with current state
+4. Write the PRD back to disk
+
+The Session Handoff block is the most important part -- it's what new agents read
+first to understand where things stand.
 
 ---
 
 ## Environment Detection
 
 In Claude Code (filesystem available):
-- JSON: write to ./[slug]-todo.json
-- HTML: write to ./[slug]-todo.html
-- Tell the user: "Open [slug]-todo.html in your browser. [slug]-todo.json is
-  the source of truth -- agents update this file to track progress."
+- JSON: ./[slug]-todo.json
+- PRD: ./[slug]-prd.md
+- HTML: ./[slug]-tracker.html
+- Tell the user: "Your project tracker is ready. Open [slug]-tracker.html in
+  your browser. Toggle between Todo and PRD views at the top. Say 'sync' anytime
+  to refresh the HTML with the latest data."
 
 In Claude.ai (sandbox environment):
-- JSON: write to /mnt/user-data/outputs/[slug]-todo.json
-- HTML: write to /mnt/user-data/outputs/[slug]-todo.html
-- Call present_files with both paths
+- JSON: /mnt/user-data/outputs/[slug]-todo.json
+- PRD: /mnt/user-data/outputs/[slug]-prd.md
+- HTML: /mnt/user-data/outputs/[slug]-tracker.html
+- Call present_files with all three paths
 
 Deriving the slug: lowercase, hyphens, no special characters.
-CampusNova becomes campusnova, My Portfolio becomes my-portfolio.
 
 ---
 
 ## Badge System -- Dynamic Generation
 
-Determine the badge set before writing any items.
+Same as before. Technical projects use the Standard Dev Badge Set (SECURITY, PERF,
+AI, DATA, ARCH, UX, TEST, BIZ). Non-technical projects get contextually generated
+badges.
 
 Technical projects (code files, APIs, databases, frameworks detected):
 Use the Standard Dev Badge Set:
@@ -167,61 +236,77 @@ Use the color palette: #ff6b6b #ffb74d #4dd0e1 #81c784 #ef9a9a #ce93d8 #9fa8da #
 
 ## Content Generation
 
-If memory context or conversation history exists: use it -- architecture, known
-bugs, planned features, team members, tech stack, past decisions, current sprint.
+If memory context or conversation history exists: use it to populate both the
+todo items AND the PRD sections.
 
 If no context is available: ask the user 3 questions before generating:
 1. What is the project and what does it do?
 2. What is the tech stack or domain?
 3. What are the 2-3 most pressing things right now?
 
-Target item counts:
-- Critical: 8-12 (blockers, security, crash risks, demo blockers)
-- Active: 10-15 (current sprint, core feature completion)
-- Polish: 10-15 (UX, performance, accessibility, empty states)
-- Long-term: 10-15 (architecture evolution, future features)
+Generate the PRD first, then derive todo items from it. This ensures alignment
+between the roadmap (PRD) and the task list (JSON).
 
-Add a note to any item where the fix is non-obvious, involves specific risk,
-or references a named team member or tool.
+Target item counts:
+- Critical: 8-12
+- Active: 10-15
+- Polish: 10-15
+- Long-term: 10-15
 
 ---
 
 ## HTML Design Spec
 
-Read references/html-design-spec.md for the complete visual design specification
-including layout, colors, fonts, header, filter bar, item styling, section progress
-bars, and localStorage behavior. Load that file before generating the HTML.
+Read references/html-design-spec.md for the complete visual design specification.
+The key addition is the view toggle at the top of the page:
+
+Toggle bar (between header and filter bar):
+- Two buttons: "Todo" | "PRD" -- pill-shaped, side by side
+- Active button: filled with accent color (#ff6b2b), white text
+- Inactive button: transparent, muted text, border
+- Default active: Todo
+- Switching toggles visibility of the todo sections vs the PRD content
+- PRD view renders the embedded PRD markdown as styled HTML
+- Filter bar only shows in Todo view
+- localStorage remembers which view was last active
+
+---
+
+## Sync Behavior
+
+When the user says "sync", "update the todo", "update the prd", or "refresh tracker":
+1. Read the current [slug]-todo.json and [slug]-prd.md
+2. Regenerate [slug]-tracker.html with both datasets embedded
+3. Reset changes_since_html to 0 in the JSON
+4. Update html_last_generated timestamp
+5. Confirm to the user what was synced
+
+Updating EITHER the todo or PRD triggers BOTH to sync into the HTML.
 
 ---
 
 ## Output Instructions
 
 1. Determine badge set for this project type
-2. Generate all four sections with items, notes, and badges
-3. Write [slug]-todo.json to disk first
-4. Generate HTML from the JSON data, embed JSON as TODO_DATA constant
-5. Write [slug]-todo.html to disk
-6. Detect environment and use correct paths
-7. Confirm both file paths to the user
-8. State item counts per section
+2. Generate the PRD first ([slug]-prd.md)
+3. Generate todo items derived from the PRD ([slug]-todo.json)
+4. Generate HTML with both datasets embedded ([slug]-tracker.html)
+5. Detect environment and use correct paths
+6. Confirm all three file paths to the user
+7. State item counts per section
 
 ---
 
 ## Quality Checklist
 
-- JSON written before HTML
-- JSON is valid and matches the schema, changes_since_html starts at 0
-- Badge set chosen before writing items (dev set or custom)
-- All badges have class, color, tooltip in the JSON badges array
-- HTML embeds full JSON as TODO_DATA constant in script block
-- Header has both rows: title row AND stats bar
-- Stats bar: Total (white), Completed (orange), Remaining (muted), 26px numbers
-- Percentage label is #e8e8ec (white, not muted grey)
-- Filter bar top set dynamically via JS (not hardcoded px)
-- Tag pills use data-tag="b-1" style (class slug, not badge name)
-- Sync button present, calls location.reload()
-- Section progress bars present under each header
-- localStorage key uses project slug
-- Blue section label reads "Long-term Features / Future"
-- Both files written to correct paths for current environment
+- PRD generated before todo items (ensures alignment)
+- PRD has all required sections including Session Handoff
+- JSON is valid, matches schema, changes_since_html starts at 0
+- HTML embeds both JSON (as TODO_DATA) and PRD (as PRD_DATA) constants
+- Toggle bar present between header and filter bar
+- Toggle defaults to Todo view
+- PRD view renders markdown as styled HTML
+- Filter bar hidden in PRD view
+- localStorage remembers active view
+- All three files written to correct paths
 - HTML opens in browser with no console errors

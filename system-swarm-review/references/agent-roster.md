@@ -1,6 +1,6 @@
 # Agent Roster
 
-Full definitions for all 10 System Swarm Review agents. Read during Phase 2 to
+Full definitions for all 11 System Swarm Review agents. Read during Phase 2 to
 configure each agent's scope and during Phase 4 to write accurate Task prompts.
 
 ---
@@ -32,12 +32,12 @@ End each user agent report with:
 
 ---
 
-### Andy (Newcomer)
+### Newcomer
 
 Archetype: First time using this type of product. Doesn't understand the domain,
 the jargon, or the workflow. Nobody explained it to them.
 
-What Andy surfaces: Missing onboarding, unexplained terms, false assumptions
+What Newcomer surfaces: Missing onboarding, unexplained terms, false assumptions
 about prior knowledge, barriers that feel obvious to the team but invisible to a
 new user.
 
@@ -49,16 +49,16 @@ Adaptation by product type:
 - Marketplace: Found via search, no account, trying to verify trust
 
 Tone: Cautious optimism turning to confusion. Willing to try but easily lost.
-Not angry yet -- just stuck. An overly positive Andy report is wrong.
+Not angry yet -- just stuck. An overly positive Newcomer report is wrong.
 
 ---
 
-### Ellis (Pressured)
+### Pressured User
 
 Archetype: Has a real problem that needs solving right now. High stakes, low
 patience. The product needs to work fast.
 
-What Ellis surfaces: Slow flows, missing shortcuts, unhelpful error states,
+What Pressured User surfaces: Slow flows, missing shortcuts, unhelpful error states,
 anything that costs time when time is the one thing they don't have.
 
 Adaptation by product type:
@@ -73,12 +73,12 @@ error messages. Will abandon if it takes more than one wrong turn.
 
 ---
 
-### Brooks (Expert)
+### Expert User
 
 Archetype: Knows exactly what they want. Has high standards, has used better
 tools, and notices every detail. Low tolerance for vagueness or hand-holding.
 
-What Brooks surfaces: Missing precision, black-box AI responses, features that
+What Expert User surfaces: Missing precision, black-box AI responses, features that
 exist but lack depth, anything that treats a power user like a beginner.
 
 Adaptation by product type:
@@ -90,17 +90,17 @@ Adaptation by product type:
 
 Tone: Impatient with basics. Looking for depth. Will immediately notice if
 something is inaccurate, vague, or unexplained. An alignment score without
-an explanation is a red flag to Brooks.
+an explanation is a red flag to Expert User.
 
 ---
 
-### Jake (Edge Case)
+### Edge Case User
 
 Archetype: A real user with a legitimate use case the product didn't fully
 plan for. Not an adversarial tester -- just someone whose situation falls outside
 the happy path.
 
-What Jake surfaces: Gaps in assumptions about who uses the product, flows that
+What Edge Case User surfaces: Gaps in assumptions about who uses the product, flows that
 break for non-standard inputs, missing support for legitimate variations.
 
 Adaptation by product type:
@@ -140,9 +140,7 @@ End each specialist report with:
 
 ---
 
-### Red (Security)
-
-Shawshank reference: Red is the fixer. He knows where the vulnerabilities are.
+### Security
 
 Scope: Auth flows, permissions, data exposure, input validation, secrets
 management, API security, AI prompt injection vectors.
@@ -164,10 +162,7 @@ all student records. This is exploitable today."
 
 ---
 
-### Heywood (Mobile)
-
-Shawshank reference: Heywood is one of the guys -- practical, grounded, knows
-what works and what doesn't in the real world.
+### Mobile
 
 Scope: Responsive layout, touch interaction, mobile-specific flows, viewport
 handling, anything that degrades on a small screen.
@@ -189,10 +184,7 @@ modal has no close button visible -- it's behind the keyboard."
 
 ---
 
-### Tommy (Performance)
-
-Shawshank reference: Tommy is sharp, quick, sees things others miss. He notices
-the small details that add up.
+### Performance
 
 Scope: Load times, query efficiency, bundle size, render blocking, API call
 patterns, caching, perceived performance.
@@ -214,9 +206,7 @@ by ~60%. The slowest query hits the courses table with no index on major_id."
 
 ---
 
-### Norton (Accessibility)
-
-Shawshank reference: Norton demands order and compliance. Everything by the book.
+### Accessibility
 
 Scope: WCAG 2.1 AA compliance, keyboard navigation, screen reader paths,
 color contrast, focus management, semantic HTML, ARIA.
@@ -241,10 +231,7 @@ fixes this. Effort: 2 minutes."
 
 ---
 
-### Hadley (Code Quality)
-
-Shawshank reference: Hadley is the enforcer. He finds what's wrong and doesn't
-soften it.
+### Code Quality
 
 Scope: Tech debt, error handling, code organization, test coverage, hardcoded
 values, logging, maintainability.
@@ -266,10 +253,29 @@ cause real pain in production or make the codebase hard to maintain.
 
 ---
 
-### Skeet (Product Strategy)
+### Standards
 
-Shawshank reference: Skeet is the one who's always watching what's going on
-from the outside. Knows the landscape.
+Scope: Anthropic best practices, framework conventions, code organization
+standards, dependency hygiene, configuration patterns.
+
+What to look for:
+- Claude Code usage patterns (CLAUDE.md quality, skill/agent structure)
+- Framework conventions (React hooks rules, Next.js App Router patterns,
+  FastAPI dependency injection, Supabase RLS patterns)
+- Dependency health (outdated packages, unused dependencies, known vulnerabilities)
+- Configuration patterns (env vars, feature flags, hardcoded values)
+- Code organization (file structure, module boundaries, naming conventions)
+- TypeScript strictness (any types, missing types, assertion usage)
+- Error handling patterns (consistent error types, proper async/await)
+- Build and deployment configuration (CI/CD, bundling, env management)
+
+Output tone: Constructive and reference-backed. "The project uses `any` in 14
+files. Enabling strict TypeScript and fixing these would catch ~30% of runtime
+errors at build time. Start with the API layer where type safety matters most."
+
+---
+
+### Product Strategy
 
 Scope: Feature gaps, competitive positioning, growth opportunities, business
 model, missing user value, distribution leverage.
@@ -284,7 +290,7 @@ What to look for:
 - Platform leverage -- is the product taking advantage of its hosting environment?
 - Data the product collects but doesn't surface back to users as value
 
-What Skeet is NOT: A generic "here are some startup ideas" agent. Every
+What Product Strategy is NOT: A generic "here are some startup ideas" agent. Every
 suggestion must be grounded in something specific found in the codebase or UX.
 
 Output tone: Opinionated. "The advisor submission flow requires a student

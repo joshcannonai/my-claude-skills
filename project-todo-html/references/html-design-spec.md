@@ -5,6 +5,35 @@ Read this when generating or regenerating the HTML file.
 
 ---
 
+## View Toggle
+
+Between the header and filter bar, add a toggle bar:
+- Container: flex row, centered, gap 8px, padding 12px 0, border-bottom 1px solid #2a2a2d
+- Two pill buttons: "Todo" and "PRD"
+- Active: background #ff6b2b, color white, font-weight 600
+- Inactive: background transparent, color #888, border 1px solid #333
+- Both: padding 8px 24px, border-radius 20px, cursor pointer, font-size 14px
+- Clicking toggles a CSS class on the main content area
+- Todo view: shows all todo sections + filter bar
+- PRD view: shows rendered PRD content, hides filter bar and todo sections
+- PRD content container: max-width 800px, padding 32px, line-height 1.7
+- PRD headings: color #e8e8ec, margin-top 32px
+- PRD blockquote (Session Handoff): border-left 3px solid #ff6b2b, padding-left 16px, background #1a1a1d, padding 16px, border-radius 4px
+- localStorage saves active view in the state object: activeView: "todo" | "prd"
+
+## Embedded Data
+
+The HTML embeds two JS constants:
+
+  const TODO_DATA = { /* full JSON */ };
+  const PRD_DATA = `/* full PRD markdown */`;
+
+PRD markdown is rendered to HTML using a lightweight inline markdown parser
+(implement ~50 lines of JS for headings, lists, bold, code blocks, blockquotes).
+No external markdown library needed.
+
+---
+
 When generating the HTML, embed all JSON data as a JS constant at the top of the
 script block. The HTML renders entirely from this embedded data -- no file fetch.
 
@@ -43,7 +72,7 @@ section accent, animated with CSS transition
 
 localStorage:
 Key: [slug]-todo-state
-Saves: { done: ["item-0",...], hideDone: false, activeFilter: "all", activeTags: [] }
+Saves: { done: ["item-0",...], hideDone: false, activeFilter: "all", activeTags: [], activeView: "todo" }
 Restores fully on page load before first render
 
 Sync button:

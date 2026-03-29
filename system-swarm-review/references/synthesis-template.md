@@ -9,6 +9,7 @@ even if content is thin. Do not reorder sections.
 
 Generated: [date]
 Agents run: [list of agents that executed]
+Run mode: [sub-agents / agent team]
 Codebase read: [key files reviewed during discovery]
 
 ---
@@ -37,13 +38,13 @@ not isolated bugs. The fact that multiple lenses found the same thing means it's
 
 ## UX Findings Summary
 
-Top findings from Andy, Ellis, Brooks, and Jake combined. Focus on patterns --
-what did multiple user personas hit?
+Top findings from Newcomer, Pressured User, Expert User, and Edge Case User combined.
+Focus on patterns -- what did multiple user personas hit?
 
-Andy (Newcomer): [2-3 most important findings]
-Ellis (Pressured): [2-3 most important findings]
-Brooks (Expert): [2-3 most important findings]
-Jake (Edge Case): [2-3 most important findings]
+Newcomer: [2-3 most important findings]
+Pressured User: [2-3 most important findings]
+Expert User: [2-3 most important findings]
+Edge Case User: [2-3 most important findings]
 
 ---
 
@@ -51,12 +52,13 @@ Jake (Edge Case): [2-3 most important findings]
 
 Top findings from each specialist agent that ran.
 
-Red (Security): [top 2-3 findings]
-Heywood (Mobile): [top 2-3 findings -- omit section if agent didn't run]
-Tommy (Performance): [top 2-3 findings]
-Norton (Accessibility): [top 2-3 findings -- omit section if agent didn't run]
-Hadley (Code Quality): [top 2-3 findings -- omit section if agent didn't run]
-Skeet (Product Strategy): [top 2-3 findings -- omit section if agent didn't run]
+Security: [top 2-3 findings]
+Mobile: [top 2-3 findings -- omit section if agent didn't run]
+Performance: [top 2-3 findings]
+Accessibility: [top 2-3 findings -- omit section if agent didn't run]
+Code Quality: [top 2-3 findings -- omit section if agent didn't run]
+Standards: [top 2-3 findings -- omit section if agent didn't run]
+Product Strategy: [top 2-3 findings -- omit section if agent didn't run]
 
 ---
 
@@ -81,14 +83,21 @@ High-value feature ideas from individual agents. Niche but worth tracking.
 
 ---
 
-## Top 10 Recommended Actions -- Ranked by Impact
+## Top 10 Recommended Actions -- Ranked by Impact (UX-Weighted)
 
 Opinionated ranking across all agents. Mix of fixes and new features. Justify ordering.
+
+UX is the primary evaluation pillar. At least 4 of the top 10 should be UX findings
+unless genuinely no UX issues were found. All pillars matter -- but user experience
+is weighted highest because it determines whether people use the product at all.
 
 | Rank | Action | Type | Agent(s) | Why This Rank |
 |------|--------|------|----------|--------------|
 | 1 | [action] | Fix/Feature | [agents] | [reason] |
 [through 10]
+
+After writing this section, also write the Top 10 to Swarm.Sync.md (see Phase 5
+of SKILL.md for the Swarm.Sync.md format).
 
 ---
 
@@ -119,7 +128,9 @@ Before the synthesis agent finalizes, verify:
 - All CRITICAL findings from every agent report appear in the Critical section
 - Cross-agent patterns have evidence from at least 2 agent reports
 - Top 10 list is ordered by real impact, not by agent execution order
+- At least 4 of the top 10 are UX findings (unless genuinely none exist)
 - Delight/preserve section is short and genuine -- not manufactured positivity
 - One-sentence summary has both halves filled in honestly
 - No finding was invented that isn't in the source agent reports
 - Sections for agents that didn't run are omitted (not left blank)
+- Swarm.Sync.md is written with the finding tally and top 10
