@@ -1,22 +1,13 @@
 ---
 name: system-swarm-review
 description: >
-  Use when the user wants a full system review, product audit, code quality pass,
-  UX research session, or multi-angle analysis of any software project. Trigger
-  phrases: "run a system review", "do a full audit", "swarm review", "product
-  review", "run the review agents", "full system check", "audit this project".
-  Reads the codebase autonomously, generates a review plan with selectable agents,
-  confirms which agents to run, then spawns them in parallel. Each agent reviews
-  the product through a distinct lens and writes findings to disk. A synthesis
-  agent compiles all reports into a ranked action list. Do NOT trigger for
-  single-topic questions like "check my security" or "review this component" --
-  those don't need the full swarm.
-license: MIT
-compatibility: Requires Claude Code with filesystem access and Task tool for
-  parallel sub-agent spawning. Confirmation checkpoint is conversational.
-metadata:
-  author: joshcannonai
-  version: "1.0"
+  This skill should be used when the user asks to "run a system review",
+  "do a full audit", "swarm review", "run the review agents", or "audit
+  this project". Deploys a configurable swarm of up to 10 specialized
+  agents that review a codebase in parallel through distinct lenses. Do
+  NOT trigger for single-topic questions like "check my security".
+context: fork
+argument-hint: "[project path or description]"
 ---
 
 # System Swarm Review
@@ -66,12 +57,10 @@ Optional (off by default): Heywood, Norton, Hadley, Skeet
 
 Read the project silently before doing anything else.
 
-Scan the file structure:
-
-  find . -type f \( -name "*.tsx" -o -name "*.ts" -o -name "*.jsx" -o -name "*.js" \
-    -o -name "*.py" -o -name "*.vue" -o -name "*.svelte" \) \
-    | grep -v node_modules | grep -v dist | grep -v ".next" | grep -v __pycache__ \
-    | head -80
+Scan the file structure using Glob patterns:
+  **/*.{tsx,ts,jsx,js,py,vue,svelte}
+Exclude: node_modules, dist, .next, __pycache__
+Limit to the first 80 results.
 
 Then read strategically:
 1. README or docs at root -- stated purpose, audience, setup instructions
@@ -100,11 +89,8 @@ parent context window -- everything they need must be in a file.
 
 Write to .claude/swarm-review/project-brief.md. Also copy the synthesis template:
 
-  cp "$(dirname "$0")/references/synthesis-template.md" \
-     .claude/swarm-review/synthesis-template.md 2>/dev/null || true
-
-If the copy fails, read references/synthesis-template.md yourself and write its
-contents to .claude/swarm-review/synthesis-template.md manually.
+Read references/synthesis-template.md from the skill directory and write its
+contents to .claude/swarm-review/synthesis-template.md.
 
 Do not proceed until both files are written.
 
@@ -164,10 +150,10 @@ Wait for user reply. Apply changes to the brief file, then proceed to Phase 4.
 
 ## Phase 4 -- Parallel Agent Deployment
 
-Spawn all active agents simultaneously using the Task tool -- all in one response.
+Spawn all active agents simultaneously using the Agent tool -- all in one response.
 Do not run sequentially.
 
-Each Task prompt must include:
+Each Agent prompt must include:
 1. Path to project brief: .claude/swarm-review/project-brief.md
 2. The agent's specific focus areas from Phase 2
 3. The output file path for that agent's report
@@ -198,7 +184,7 @@ agent. Sub-agents cannot spawn sub-agents -- synthesis is always the parent's jo
 
 Before spawning, verify all active agent output files exist.
 
-Synthesis Task prompt:
+Synthesis Agent prompt:
 
   You are synthesizing results from a multi-agent system review.
 
@@ -242,7 +228,7 @@ Give a brief verbal summary of the top 5 findings across all agents.
   Check with: ls .claude/swarm-review/ before spawning.
 
 - Sub-agents cannot spawn sub-agents: Synthesis is always the parent's job,
-  called after the swarm completes -- not inside any agent Task.
+  called after the swarm completes -- not inside any agent call.
 
 - Specialist scope drift: Red should not comment on UX. Tommy should not audit
   auth. Each agent stays in its lane. The synthesis is where patterns cross.

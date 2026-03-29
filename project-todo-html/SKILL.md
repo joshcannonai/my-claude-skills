@@ -1,22 +1,12 @@
 ---
 name: project-todo-html
 description: >
-  Use ONLY when the user explicitly asks to generate, create, or build a
-  to-do list, task tracker, issue tracker, checklist, or project tracker
-  as a FILE or HTML document for a specific named project. Trigger phrases:
-  "generate todo", "create a todo", "master todo", "task tracker", "issue
-  tracker", "project checklist", "what's left to build", "make a todo html",
-  "build me a tracker". Output is always a JSON file (source of truth) and an
-  HTML file (human-readable view). Do NOT trigger for general questions about
-  what to work on next, sprint planning discussions, casual "what should I do?"
-  questions, or requests that don't explicitly ask for a file/document output.
-license: MIT
-compatibility: Works in Claude Code (writes to project directory) and Claude.ai
-  (writes to sandbox outputs). No sub-agents required. Google Fonts is the only
-  external dependency in the generated HTML file.
-metadata:
-  author: joshcannonai
-  version: "2.0"
+  This skill should be used ONLY when the user explicitly asks to "generate
+  todo", "create a todo", "master todo", "task tracker", "build me a tracker",
+  or "what's left to build" as a FILE for a specific named project. Outputs a
+  JSON source of truth and an HTML visual tracker. Do NOT trigger for general
+  planning questions or casual "what should I do?" questions.
+argument-hint: "[project name]"
 ---
 
 # Project Master To-Do HTML Generator
@@ -95,8 +85,9 @@ Section IDs are always: critical, active, polish, longterm
 ## Agent Instructions -- Reading and Writing the JSON
 
 When another agent needs to understand project state:
-  cat [slug]-todo.json
+  Read the [slug]-todo.json file using the Read tool.
 The JSON is the ground truth. Do not read the HTML to understand project state.
+Use the Read tool, not cat or Bash, to read the JSON.
 
 When an agent completes a task and wants to mark it done:
 1. Read the JSON
@@ -197,50 +188,9 @@ or references a named team member or tool.
 
 ## HTML Design Spec
 
-When generating the HTML, embed all JSON data as a JS constant at the top of the
-script block. The HTML renders entirely from this embedded data -- no file fetch.
-
-  const TODO_DATA = { /* paste full JSON here */ };
-
-The rest of the JS reads from TODO_DATA rather than hardcoded HTML elements.
-When regenerating, replace the TODO_DATA constant with the updated JSON.
-
-Visual Design:
-- Background: #0d0d0f, surfaces #141416 / #1a1a1d
-- Fonts: IBM Plex Mono + IBM Plex Sans via Google Fonts (only external dependency)
-- Accent: #ff6b2b for project title, active states, completed count
-- Full-width layout, no max-width centering, padding 36px 48px on main
-
-Header (sticky, two rows):
-Row 1: Project name in orange IBM Plex Mono, subtitle, generation date
-Row 2: Stats bar with three cards (Total / Completed / Remaining), gradient
-progress bar, and white percentage label
-
-Stats bar: font-size 26px for numbers, color #e8e8ec for percentage label,
-gradient linear-gradient(90deg, #ff6b2b, #ffaa00) for the fill bar
-
-Filter Bar (sticky below header, top offset set dynamically via JS):
-Left to right: All / Critical / Active / Polish / Future | Hide Completed |
-Search input (200 to 260px on focus, orange border when active) | Tags dropdown
-(multi-select popover, data-tag uses class slug e.g. b-1) | Sync button | Copy MD
-
-Items:
-- Click toggles .done class: strikethrough + 0.42 opacity + faded badge
-- Each badge has data-tip tooltip (3-6 words) shown on hover
-- data-id="item-N" assigned by JS on init for localStorage mapping
-
-Section progress bars:
-3px bar below each section header, fills as items complete, color matches
-section accent, animated with CSS transition
-
-localStorage:
-Key: [slug]-todo-state
-Saves: { done: ["item-0",...], hideDone: false, activeFilter: "all", activeTags: [] }
-Restores fully on page load before first render
-
-Sync button:
-Calls location.reload(). Since localStorage persists checkbox state, reloading
-always restores the user's progress even when the agent has rewritten the HTML.
+Read references/html-design-spec.md for the complete visual design specification
+including layout, colors, fonts, header, filter bar, item styling, section progress
+bars, and localStorage behavior. Load that file before generating the HTML.
 
 ---
 
