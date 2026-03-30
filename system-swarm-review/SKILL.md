@@ -117,32 +117,50 @@ Present the plan and let the user toggle agents and choose run mode.
 
   PROJECT: [Product Name] -- [one-line description]
 
-  AGENTS READY TO DEPLOY:
+  WALKTHROUGH: [N] steps -- [brief description of the flow being tested]
 
-  User Perspective (simulating real users):
-    [ON]  Newcomer        -- first impressions, onboarding, jargon
-    [ON]  Pressured User  -- high-stakes flows, errors, time pressure
-    [ON]  Expert User     -- missing depth, power features, precision
-    [ON]  Edge Case User  -- non-standard use cases, planning gaps
+  -- AGENT SELECTOR --
 
-  Specialist Review:
-    [ON]  Security           -- auth, secrets, injection, permissions
-    [OFF] Mobile             -- responsive layout, touch, mobile flows
-    [ON]  Performance        -- load times, queries, bundle, rendering
-    [OFF] Accessibility      -- WCAG, keyboard nav, contrast
-    [OFF] Code Quality       -- debt, error handling, test coverage
-    [ON]  Standards          -- best practices, conventions, dependencies
-    [OFF] Product Strategy   -- gaps, growth, competitive positioning
+    User Perspective:
+    [1]  * Newcomer         -- first impressions, onboarding, jargon
+    [2]  * Pressured User   -- high-stakes flows, errors, time pressure
+    [3]  * Expert User      -- missing depth, power features, precision
+    [4]  * Edge Case User   -- non-standard use cases, planning gaps
 
-  WALKTHROUGH: [N] steps -- [brief description of flow]
+    Specialists:
+    [5]  * Security         -- auth, secrets, injection, permissions
+    [6]  . Mobile           -- responsive layout, touch, mobile flows
+    [7]  * Performance      -- load times, queries, bundle, rendering
+    [8]  . Accessibility    -- WCAG, keyboard nav, contrast
+    [9]  . Code Quality     -- debt, error handling, test coverage
+    [10] * Standards        -- best practices, conventions, dependencies
+    [11] . Product Strategy -- gaps, growth, competitive positioning
 
-  RUN MODE:
-    [SUB-AGENTS] Parallel, isolated context, standard token cost (default)
-    [AGENT TEAM]  Collaborative, shared context, ~7x token cost
+    Run Mode:
+    [S]  * Sub-agents       -- parallel, isolated, standard cost (default)
+    [T]  . Agent team       -- collaborative, shared context, ~7x cost
 
-  Toggle agents on/off, change run mode, or say "run it" to proceed.
+    Toggle:  type numbers to flip (e.g. "6 8 11")
+    Run:     type "go" to launch with current selection
+    All on:  type "all"
+    Custom:  type "c: [your instructions]"
+             e.g. "c: add a DevOps agent focused on CI/CD pipeline"
+             e.g. "c: have Security focus specifically on the Supabase RLS policies"
 
-Wait for user reply. Apply changes, then proceed to Phase 4.
+* = ON (will run), . = OFF (skipped)
+
+Wait for user reply. Parse their input:
+- Numbers (e.g. "6 8 11") -- flip those agents on/off state, re-display the selector
+- "go" -- proceed to Phase 4 with current selection
+- "all" -- turn all agents on, re-display
+- "s" or "t" -- switch run mode, re-display
+- "c: [text]" -- apply the custom instruction (add agent, modify focus, change scope),
+  update the project brief, re-display the selector with changes applied
+- Any combination (e.g. "6 8 go") -- apply toggles then launch
+
+If the user sends numbers without "go", re-display the updated selector so they
+can verify before launching. Only proceed to Phase 4 when "go" is explicitly sent
+or the user says something clearly affirmative like "run it", "launch", "let's go".
 
 ---
 
