@@ -136,11 +136,15 @@ Present the plan and let the user toggle agents and choose run mode.
     [10] * Standards        -- best practices, conventions, dependencies
     [11] . Product Strategy -- gaps, growth, competitive positioning
 
-    Run Mode:
-    [S]  * Sub-agents       -- parallel, isolated, standard cost (default)
-    [T]  . Agent team       -- collaborative, shared context, ~7x cost
+    Settings:
+    [M]  * Sonnet            -- fast, cost-effective, great for most reviews (default)
+         . Opus              -- maximum depth, higher token cost
+    [S]  * Sub-agents        -- parallel, isolated, standard cost (default)
+    [T]  . Agent team        -- collaborative, shared context, ~7x cost
 
-    Toggle:  type numbers to flip (e.g. "6 8 11")
+    Toggle:  type numbers to flip agents (e.g. "6 8 11")
+    Model:   type "m" to switch between Sonnet and Opus
+    Mode:    type "s" or "t" to switch run mode
     Run:     type "go" to launch with current selection
     All on:  type "all"
     Custom:  type "c: [your instructions]"
@@ -153,6 +157,7 @@ Wait for user reply. Parse their input:
 - Numbers (e.g. "6 8 11") -- flip those agents on/off state, re-display the selector
 - "go" -- proceed to Phase 4 with current selection
 - "all" -- turn all agents on, re-display
+- "m" -- toggle model between Sonnet and Opus, re-display
 - "s" or "t" -- switch run mode, re-display
 - "c: [text]" -- apply the custom instruction (add agent, modify focus, change scope),
   update the project brief, re-display the selector with changes applied
@@ -165,6 +170,10 @@ or the user says something clearly affirmative like "run it", "launch", "let's g
 ---
 
 ## Phase 4 -- Parallel Agent Deployment
+
+Model selection: When spawning agents, pass the selected model. If Sonnet was
+selected (default), use model: "sonnet". If Opus was selected, use model: "opus".
+This applies to both sub-agents and agent team modes.
 
 If sub-agents mode (default):
 Spawn all active agents simultaneously using the Agent tool -- all in one response.
