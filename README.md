@@ -10,60 +10,77 @@ Agent Skills are modular, version-controlled folders of instructions, scripts, a
 
 ### [`system-swarm-review`](./system-swarm-review/)
 
-Deploys a configurable swarm of up to 10 specialized review agents against any software project. Each agent reviews through a distinct lens. The user selects which agents to run before anything executes.
+Deploys a configurable swarm of up to 11 specialized review agents against any software project. Each agent reviews through a distinct lens. The user selects which agents to run and chooses the run mode (sub-agents or agent team) at a confirmation checkpoint before anything executes.
 
-**The roster — all named after Shawshank Redemption characters:**
+**User Perspective Agents** (simulate real users):
+- **Newcomer** — first impressions, onboarding confusion, jargon
+- **Pressured User** — high-stakes flows, error states, time pressure
+- **Expert User** — missing depth, black-box logic, power feature gaps
+- **Edge Case User** — non-standard use cases, planning gaps
 
-*User Perspective (simulate real users):*
-- **Andy (Newcomer)** — first impressions, onboarding confusion, jargon
-- **Ellis (Pressured)** — high-stakes flows, error states, time pressure
-- **Brooks (Expert)** — missing depth, black-box logic, power feature gaps
-- **Jake (Edge Case)** — non-standard use cases, planning gaps
+**Specialist Agents** (examine the system directly):
+- **Security** — auth, RLS, secrets, injection vectors, permissions
+- **Mobile** — responsive layout, touch targets, mobile-only flows
+- **Performance** — load times, query count, bundle size, rendering
+- **Accessibility** — WCAG 2.1 AA, keyboard nav, color contrast
+- **Code Quality** — tech debt, error handling, test coverage
+- **Standards** — Anthropic best practices, framework conventions, dependency hygiene
+- **Product Strategy** — competitive gaps, missing features, growth
 
-*Specialists (examine the system directly):*
-- **Red (Security)** — auth, RLS, secrets, injection vectors, permissions
-- **Heywood (Mobile)** — responsive layout, touch targets, mobile-only flows
-- **Tommy (Performance)** — load times, query count, bundle size, rendering
-- **Norton (Accessibility)** — WCAG 2.1 AA, keyboard nav, color contrast
-- **Hadley (Code Quality)** — tech debt, error handling, test coverage
-- **Skeet (Product Strategy)** — competitive gaps, missing features, growth
+**Defaults on:** Newcomer, Pressured User, Expert User, Edge Case User, Security, Performance, Standards (7 agents). Toggle any of the 11 on/off at the confirmation checkpoint.
 
-**Defaults on:** Andy, Ellis, Brooks, Jake, Red, Tommy — covers the most critical ground. Toggle any of the 10 on/off at the confirmation checkpoint.
+**Run modes:**
+- **Sub-agents** (default) — parallel, isolated context, standard token cost
+- **Agent team** — collaborative, shared context, ~7x token cost
+
+**Key features:**
+- `Swarm.Sync.md` — persistent findings file updated each run with finding tally, top 10 actions (UX-weighted), and user decision log
+- After user reviews findings (IMPLEMENT / CHANGE / REMOVE / DEFER), the skill auto-updates the project's todo JSON and PRD
+- UX-weighted synthesis — at least 4 of the top 10 findings are UX-related
 
 **Example output:**
 ```
 .claude/swarm-review/
 ├── project-brief.md
-├── andy.md
-├── ellis.md
-├── brooks.md
-├── jake.md
-├── red.md
-├── tommy.md
-└── 20260329-1430-synthesis.md
+├── newcomer.md
+├── pressured-user.md
+├── expert-user.md
+├── edge-case-user.md
+├── security.md
+├── performance.md
+├── standards.md
+├── 20260329-1430-synthesis.md
+└── Swarm.Sync.md
 ```
 
-**Requirements:** Claude Code with filesystem access and Task tool (sub-agent) support.
+**Requirements:** Claude Code with filesystem access and Agent tool (sub-agent) support.
 
 ---
 
 ### [`project-todo-html`](./project-todo-html/)
 
-Generates a two-file task tracking system: a JSON source of truth that agents read and write, and an HTML visual tracker that humans open in the browser.
+Generates a three-file project tracking system: a JSON task list, a PRD markdown file, and an HTML tracker with a toggle between both views.
 
-**Two-file architecture:**
-- `[project]-todo.json` — agents update this between sessions to track progress
-- `[project]-todo.html` — regenerated from the JSON when you ask, or when enough changes accumulate
+**Three-file architecture:**
+- `[slug]-todo.json` — task tracking source of truth; agents read and write this between sessions
+- `[slug]-prd.md` — product requirements document; agents update as decisions are made
+- `[slug]-tracker.html` — interactive HTML with toggle between Todo view (default) and PRD view
 
-This means agents can mark tasks done, add new items, and reprioritize mid-session without touching the HTML. The HTML is always a clean snapshot generated from the JSON.
+The JSON and PRD are living documents — agents update them between sessions to track progress, record decisions, and maintain a "Session Handoff" block so new agents can get caught up instantly. The HTML is only regenerated when you say "sync" or "update".
 
 **HTML features:**
+- Toggle bar: switch between Todo and PRD views
 - Section filters (Critical / Active / Polish / Long-term) + full-text search + tag filtering
 - Stats bar: Total / Completed / Remaining with gradient progress bar
 - Dynamic badge system — dev projects get SECURITY/PERF/AI/DATA/ARCH/UX/TEST/BIZ; other projects get contextually generated categories
-- localStorage persistence — checkbox state survives tab closes and page reloads
-- Sync button — reloads HTML from disk while preserving checkbox state
-- Copy as Markdown — exports open items for pasting into GitHub issues or agent prompts
+- localStorage persistence — checkbox state and active view survive tab closes
+- Sync button + Copy as Markdown
+
+**PRD includes:**
+- Session Handoff block (5-line summary for new agents)
+- Vision, target users, core features, planned features
+- Tech stack, architecture decisions (with dates and rationale)
+- Current status and open blockers
 
 **Works in:** Claude Code (writes to project directory) and Claude.ai (writes to outputs sandbox).
 
@@ -90,7 +107,7 @@ cp -r my-claude-skills/project-todo-html /your/project/.claude/skills/
 
 1. Download the skill folder you want
 2. Zip it — the zip must contain the folder itself at the root, not just the contents
-3. Go to **Settings → Features → Skills → Upload**
+3. Go to **Settings > Features > Skills > Upload**
 
 > Skills do not sync between Claude Code and Claude.ai. Install separately for each surface.
 
@@ -141,7 +158,7 @@ SKILL.md bodies are kept lean per the spec's 500-line recommendation. Reference 
 
 **Honest failure modes.** Each skill documents its own gotchas — the mistakes Claude makes without the skill, and the patterns the skill itself is prone to.
 
-**Named characters, consistent behavior.** Andy, Ellis, Brooks, Jake, Red, Heywood, Tommy, Norton, Hadley, and Skeet appear in every review. Consistent names mean consistent mental models and comparable output across runs.
+**UX is the #1 pillar.** User experience is weighted highest in synthesis and rankings because it determines whether people use the product at all.
 
 ---
 
