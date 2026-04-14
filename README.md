@@ -8,73 +8,79 @@ Agent Skills are modular, version-controlled folders of instructions, scripts, a
 
 ## Skills
 
-### [`system-swarm-review`](./system-swarm-review/)
+### [`system-swarm-review`](./system-swarm-review/) — v2
 
-Deploys a configurable swarm of up to 11 specialized review agents against any software project. Each agent reviews through a distinct lens. The user selects which agents to run and chooses the run mode (sub-agents or agent team) at a confirmation checkpoint before anything executes.
+Deploys a configurable swarm of specialized review agents against any software project. Each agent reviews through a distinct lens. The user selects which agents to run via a native picker (arrow keys to navigate, space to toggle, enter to confirm) before anything executes.
 
-**User Perspective Agents** (simulate real users):
-- **Newcomer** — first impressions, onboarding confusion, jargon
-- **Pressured User** — high-stakes flows, error states, time pressure
-- **Expert User** — missing depth, black-box logic, power feature gaps
-- **Edge Case User** — non-standard use cases, planning gaps
+**Two agent categories:**
 
-**Specialist Agents** (examine the system directly):
-- **Security** — auth, RLS, secrets, injection vectors, permissions
-- **Mobile** — responsive layout, touch targets, mobile-only flows
-- **Performance** — load times, query count, bundle size, rendering
-- **Accessibility** — WCAG 2.1 AA, keyboard nav, color contrast
-- **Code Quality** — tech debt, error handling, test coverage
-- **Standards** — Anthropic best practices, framework conventions, dependency hygiene
-- **Product Strategy** — competitive gaps, missing features, growth
+**Personas** — simulate real users moving through the product. Auto-generated per project based on likely real users of the codebase (e.g., "Freshman three weeks into Week 1", "Senior managing 4 years of notes"). 4 candidates per run, top 2 pre-selected.
 
-**Defaults on:** Newcomer, Pressured User, Expert User, Edge Case User, Security, Performance, Standards (7 agents). Toggle any of the 11 on/off at the confirmation checkpoint.
+**Specialists** — examine the system directly through technical lenses. Fixed roster of 7, filtered to the 4 most relevant for the detected project type (web app / CLI / API / ML pipeline / content site).
 
-**Run modes:**
-- **Sub-agents** (default) — parallel, isolated context, standard token cost
-- **Agent team** — collaborative, shared context, ~7x token cost
+| Specialist | Focus |
+|---|---|
+| Security | auth, RLS, secrets, injection vectors, permissions |
+| Mobile | responsive layout, touch targets, viewport issues |
+| Performance | load times, query count, bundle size, rendering |
+| Accessibility | WCAG 2.2 AA, keyboard nav, color contrast |
+| Code Quality | tech debt, error handling, test coverage |
+| Standards | Anthropic best practices, framework conventions, dependency hygiene |
+| Product Strategy | competitive gaps, missing features, growth |
+
+**Selection UI (v2):** Single `AskUserQuestion` call with three questions — model (Sonnet/Opus), personas (multi-select), specialists (multi-select). Total agents softcapped at 4 by default with a warning at 5+. Opus cost warning when 3+ Opus agents selected.
 
 **Key features:**
-- `Swarm.Sync.md` — persistent findings file updated each run with finding tally, top 10 actions (UX-weighted), and user decision log
+- Project-specific persona generation — not generic templates, actual likely users of *your* codebase
+- Timestamped run directories — repeat runs don't overwrite each other
+- `Swarm.Sync.md` — persistent across-run memory with finding tally and top-10 actions (UX-weighted via tiebreaker)
 - After user reviews findings (IMPLEMENT / CHANGE / REMOVE / DEFER), the skill auto-updates the project's todo JSON and PRD
-- UX-weighted synthesis — at least 4 of the top 10 findings are UX-related
+- Built-in prompt-injection defenses — sub-agents are instructed to treat project files as data, not instructions; secrets are redacted from the brief; suspicious CLAUDE.md content is flagged before the run
 
 **Example output:**
 ```
-.claude/swarm-review/
+.claude/swarm-review/20260414-1430/    ← timestamped per run
 ├── project-brief.md
-├── newcomer.md
-├── pressured-user.md
-├── expert-user.md
-├── edge-case-user.md
-├── security.md
-├── performance.md
-├── standards.md
-├── 20260329-1430-synthesis.md
-└── Swarm.Sync.md
+├── synthesis-template.md
+├── personas/
+│   ├── freshman-week-1.md
+│   └── senior-managing-notes.md
+├── specialists/
+│   ├── security.md
+│   └── performance.md
+└── synthesis.md
+
+.claude/swarm-review/Swarm.Sync.md     ← persistent across runs
 ```
 
-**Requirements:** Claude Code with filesystem access and Agent tool (sub-agent) support.
+**Requirements:** Claude Code with filesystem access, the `Agent` tool (sub-agent support), and `AskUserQuestion` tool.
 
 ---
 
-### [`project-todo-html`](./project-todo-html/)
+### [`project-todo-html`](./project-todo-html/) — v2
 
-Generates a three-file project tracking system: a JSON task list, a PRD markdown file, and an HTML tracker with a toggle between both views.
+Generates a live-updating four-file project tracker: a JSON task list, a PRD markdown file, a generated data bridge, and a static HTML shell that auto-refreshes every 5 seconds as agents update the underlying files.
 
-**Three-file architecture:**
-- `[slug]-todo.json` — task tracking source of truth; agents read and write this between sessions
+**Four-file architecture:**
+- `[slug]-todo.json` — task tracking source of truth; agents read and write this directly
 - `[slug]-prd.md` — product requirements document; agents update as decisions are made
-- `[slug]-tracker.html` — interactive HTML with toggle between Todo view (default) and PRD view
+- `[slug]-data.js` — generated view layer (`window.TRACKER_DATA = { todo, prd }`); only file agent updates rewrite
+- `[slug]-tracker.html` — static HTML shell written once; loads data.js via a cache-busting `<script>` tag on every meta-refresh tick
 
-The JSON and PRD are living documents — agents update them between sessions to track progress, record decisions, and maintain a "Session Handoff" block so new agents can get caught up instantly. The HTML is only regenerated when you say "sync" or "update".
+**Why split data from view?** Agent updates rewrite only ~5KB of `data.js` instead of the ~30KB HTML. 5-6x fewer tokens per update, faster writes, and the HTML stays stable so localStorage state (scroll, active view, filters, collapsed sections) survives every refresh.
+
+**Live refresh:** The HTML has `<meta http-equiv="refresh" content="5">` and a cache-busting inline script that injects `<script src="./data.js?t=Date.now()">` dynamically. Works on `file://` across all modern browsers — no server, no CORS, no infrastructure.
+
+**Auto-update via CLAUDE.md injection (opt-in):** At generation time, the skill offers to add a short rule to your project's `CLAUDE.md` that tells future agents to announce-then-update the tracker when they complete tasks, make architecture decisions, or pivot on scope. The "announce before applying" safety net means the user sees every change in the transcript and can veto.
 
 **HTML features:**
 - Toggle bar: switch between Todo and PRD views
 - Section filters (Critical / Active / Polish / Long-term) + full-text search + tag filtering
 - Stats bar: Total / Completed / Remaining with gradient progress bar
-- Dynamic badge system — dev projects get SECURITY/PERF/AI/DATA/ARCH/UX/TEST/BIZ; other projects get contextually generated categories
-- localStorage persistence — checkbox state and active view survive tab closes
-- Sync button + Copy as Markdown
+- Show completed toggle with live-computed counter: `Show completed (23)`
+- Dynamic badge system — dev projects get SECURITY/PERF/AI/DATA/ARCH/UX/TEST/BIZ; non-dev projects get contextually generated categories
+- localStorage persistence: scroll position, active view, filters, and collapsed sections survive the 5-second refresh
+- Clickable `file://` URL printed after generation — Cmd-click in modern terminals (iTerm2, Warp, Terminal.app, Alacritty, WezTerm, Ghostty)
 
 **PRD includes:**
 - Session Handoff block (5-line summary for new agents)
@@ -159,6 +165,31 @@ SKILL.md bodies are kept lean per the spec's 500-line recommendation. Reference 
 **Honest failure modes.** Each skill documents its own gotchas — the mistakes Claude makes without the skill, and the patterns the skill itself is prone to.
 
 **UX is the #1 pillar.** User experience is weighted highest in synthesis and rankings because it determines whether people use the product at all.
+
+**Token-efficient by construction.** Architecture decisions favor small, incremental rewrites over full regenerations. `project-todo-html` v2 rewrites ~5KB per update instead of ~30KB. Small decisions compound over hundreds of agent turns.
+
+---
+
+## v2 Highlights (April 2026)
+
+Both skills were reworked in v2 with specific goals driven by real-user feedback from indie hackers, students, and senior engineers:
+
+**system-swarm-review v2:**
+- Native `AskUserQuestion` picker replaces the ASCII toggle UI (arrow keys instead of typing numbers)
+- Project-specific persona generation replaces generic templates
+- Project-type-filtered specialists (web app / CLI / API / ML / content site)
+- Timestamped run directories (no more overwrite bugs)
+- Team mode removed — sub-agents only, simpler and cheaper by default
+- Built-in prompt-injection defenses (content-as-data instruction, secret redaction, hostile-content flagging)
+- WCAG 2.2 compliance updated from 2.1
+
+**project-todo-html v2:**
+- Four-file split (HTML shell / data.js / JSON / PRD) — cheaper agent updates, stable UI
+- Auto-refresh via meta refresh + cache-bust script (no server required)
+- Hybrid CLAUDE.md auto-update injection (opt-in, announce-before-apply)
+- localStorage state preservation across refreshes (scroll, view, filters, collapsed sections)
+- Show completed counter, live-computed client-side
+- Clickable `file://` URL printed after generation
 
 ---
 
