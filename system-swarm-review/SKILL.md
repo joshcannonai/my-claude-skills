@@ -35,6 +35,12 @@ You typically want at least one persona + one specialist for a well-rounded revi
 Eleven specialized agents are available. Read `references/agent-roster.md` for
 full definitions of each agent's scope, focus areas, and output format.
 
+For a complete worked example of what a run looks like end-to-end (project
+brief → persona report → specialist report → synthesis + JSON), see
+`references/example-output.md`. New users should read that reference once
+before their first run — it's the fastest way to calibrate expectations and
+know what "done" looks like.
+
 **User Perspective Agents** (simulate real users moving through the product):
 
 | Agent | Focus |
@@ -62,6 +68,50 @@ full definitions of each agent's scope, focus areas, and output format.
 
 ---
 
+## Invocation Modes
+
+The skill supports three modes, detected from keywords in the user's request. All three write to the same timestamped output directory and produce the same synthesis files — they only differ in which phases run.
+
+### Full mode (default)
+
+All 6 phases run. Discovery → candidate generation → `AskUserQuestion` picker → deployment → synthesis → user review. Use when you want maximum thoughtfulness — multiple personas, multiple specialists, user-curated selection.
+
+**Triggered by:** "run a swarm review", "full audit", "review this codebase", "swarm review", etc. This is the default — any unqualified review request lands here.
+
+**Discoverability nudge:** Before starting the full-mode flow on an unqualified request, mention quick mode as a cheaper alternative in one line:
+
+> "Starting a full swarm review (6 phases, ~$0.40-3.00 depending on project size).
+> Tip: say 'quick review' or 'quick swarm' next time to skip the picker and run
+> 3 agents in ~4 minutes on Sonnet for ~$0.40. Proceeding with full mode..."
+
+This runs once per session the first time the user invokes full mode. Don't repeat it on subsequent invocations in the same conversation.
+
+### Quick mode
+
+Phases 1, 4, 5, 6 run. Phases 2 and 3 are skipped. The skill auto-picks a fixed 3-agent combo:
+- **1 auto-generated persona** (the single most likely user for this project type — no picker, no candidates, just the top match)
+- **Security specialist**
+- **Performance specialist**
+- **Sonnet model, always** (Opus not offered in quick mode)
+
+No `AskUserQuestion` call. No agent selection UI. The user gets findings within a few minutes.
+
+**Triggered by:** "quick swarm", "quick swarm review", "fast review", "quick audit", "30-second review", or any request that includes the word "quick" or "fast" alongside review keywords. Also triggered if the user explicitly asks to "skip the picker" or "just run it".
+
+**When to suggest quick mode unprompted:** if the user says something like "I just need a quick smell test" or "I don't have much time", offer quick mode explicitly in a one-line confirmation rather than starting the full flow.
+
+### Dry-run mode
+
+Phases 1-3 run normally. Phase 4 is replaced with a preview: the skill writes what it *would* send to each agent (full prompts, focus areas, output paths) to `$RUN_DIR/dry-run.md` and stops. No sub-agents spawn, no tokens spent on the review itself, no synthesis.
+
+Use when you want to see exactly what the swarm would do before committing to the spend — especially useful with Opus.
+
+**Triggered by:** "dry run", "preview the swarm", "show me the prompts", "what would you send to the agents".
+
+**After a dry run:** tell the user *"Dry run complete — prompts are at $RUN_DIR/dry-run.md. Say 'go' or 'run it for real' to execute with the same selection."* If they say go, re-run from phase 4 using the existing `$RUN_DIR` (which already has the brief + candidates + selection from the dry run).
+
+---
+
 ## Phase 1 — Discovery
 
 Read the project silently before doing anything else.
@@ -86,6 +136,19 @@ Build a project brief covering:
 - Tech stack (frontend, backend, database, AI/external services)
 - Core user flows (the paths that matter)
 - Immediate red flags from code reading
+- **Project size class** — small / medium / large, used later for the cost estimate in phase 3
+
+### Project size classification
+
+During the Glob scan, count files. Also run a quick `wc -l` across the scanned files to get an approximate line count. Bucket:
+
+| Class | File count | LOC (approx) | Cost multiplier |
+|---|---|---|---|
+| Small | < 50 | < 50K | 1.0x |
+| Medium | 50-500 | 50K-500K | 2.0x |
+| Large | > 500 | > 500K | 4.0x |
+
+Write the class and counts into the project brief. They're used in Phase 3 to compute the cost estimate shown to the user before they commit to the run.
 
 Read `references/walkthrough-guide.md` to determine appropriate walkthrough steps
 based on product type.
@@ -223,12 +286,78 @@ Validate the selection:
 
    Do NOT block — just inform.
 
-4. **Custom instructions:** the "Other" free-text option is available on every
+4. **Zero specialists warning** (high-leverage false-negative guard): if the
+   user picked ≥1 persona but 0 specialists, warn them explicitly before
+   proceeding:
+   > `⚠ No specialists selected. Personas alone will surface UX issues but
+   > miss security, performance, and code quality problems. Add at least one
+   > specialist, or confirm you only want user-perspective feedback.`
+
+   Use an `AskUserQuestion` with `Add specialists`, `Proceed personas-only`,
+   and `Cancel`. Default-recommend `Add specialists`. This prevents a silent
+   false-negative where a user opts into "UX only" without realizing they're
+   missing the rest of the review surface.
+
+5. **Custom instructions:** the "Other" free-text option is available on every
    `AskUserQuestion` question. If the user provides custom text on the Personas
    or Specialists question, parse it as an extra agent or a focus modifier and
    append to `$RUN_DIR/project-brief.md` under `## Custom Instructions`.
 
-After validation passes, proceed to Phase 4.
+### Cost estimate confirmation
+
+After the user picks agents and model, compute and display an estimated cost
+before spawning anything. This is a one-line message, not another
+`AskUserQuestion` — but if the estimate exceeds $5, include a final confirmation
+question before proceeding.
+
+**Formula** (update the constants as pricing changes — verify at runtime if unsure):
+
+```
+per_agent_tokens    ≈ 20,000  (brief read + focused reads + report write, rough)
+per_agent_cost_usd  ≈ 0.13 × size_multiplier  (Sonnet)
+per_agent_cost_usd  ≈ 0.66 × size_multiplier  (Opus)
+total_cost_usd      ≈ per_agent_cost × agent_count × size_multiplier
+```
+
+Size multipliers come from phase 1 (small=1x, medium=2x, large=4x).
+
+**Display format:**
+
+```
+Estimated cost: ~$<low>-<high>  (<agent_count> agents × <model> × <size> project)
+```
+
+Where `<low>` and `<high>` bracket the estimate ±30% to account for variance.
+
+**Examples the skill should render:**
+
+- `Estimated cost: ~$0.30-0.50  (3 agents × Sonnet × small project)`
+- `Estimated cost: ~$1.60-2.40  (4 agents × Sonnet × medium project)`
+- `Estimated cost: ~$5.50-8.00  (4 agents × Opus × medium project)`
+
+**If total_cost_usd > $5**, add a final confirmation:
+
+> `⚠ This is a higher-cost run. Proceed, or trim agents / switch to Sonnet?`
+
+Use an `AskUserQuestion` with options `Proceed`, `Switch to Sonnet`, `Cancel`.
+
+**Handling each option:**
+- `Proceed` → skip to Phase 4 with current selection
+- `Switch to Sonnet` → re-compute the cost estimate with `model = sonnet`,
+  display the new estimate inline as one line ("New estimate: ~$X.XX"), then
+  proceed to Phase 4 without re-asking. Do NOT pop the confirmation dialog
+  again — the user already decided to switch models, they don't need to
+  reconfirm the cheaper price.
+- `Cancel` → stop. Do not create any agent output files. Leave `$RUN_DIR` in
+  place so the user can inspect the brief if they want.
+
+**For quick mode**, skip this entire confirmation — quick mode always runs 3
+agents on Sonnet, which costs ~$0.40 on any project. Just print the estimate
+as one line before spawning:
+
+> `Quick review: ~$0.40  (3 agents × Sonnet × small project). Running now.`
+
+After validation + cost confirmation passes, proceed to Phase 4.
 
 ---
 
@@ -236,6 +365,86 @@ After validation passes, proceed to Phase 4.
 
 **Model selection:** When spawning agents, pass the selected model. If Sonnet was
 selected (the default), use `model: "sonnet"`. If Opus was selected, use `model: "opus"`.
+
+### Resume detection — detect incomplete runs, ask the user, then skip completed agents
+
+Before starting a fresh run, check the most recent existing `$RUN_DIR` (if any)
+for signs of an incomplete prior run. A run is **incomplete** if:
+
+- A `$RUN_DIR/project-brief.md` exists
+- AND at least one agent output file exists in `$RUN_DIR/personas/` or `$RUN_DIR/specialists/`
+- AND at least one *expected* agent output file is missing OR lacks a completion marker
+
+**Agent completion markers:** Every agent output file must end with the literal
+line `<!-- SWARM_AGENT_COMPLETE -->` as the last non-empty line. This is added
+by the agent as its final write and means "my report finished successfully."
+Resume detection reads the last 100 bytes of each file and looks for this
+marker — **file size alone is not sufficient**. A 300-byte file containing
+`Error: connection timeout` passes a size check but has no marker, so it's
+correctly treated as incomplete and re-run.
+
+**If an incomplete run is detected**, DO NOT silently resume. Ask the user via
+a single-question `AskUserQuestion`:
+
+> "I found an incomplete swarm run from [timestamp] in `[$RUN_DIR]` — looks
+> like [N] of [M] agents finished. Resume that run (re-spawns only the missing
+> agents), or start a fresh run from scratch?"
+
+Options:
+- `Resume (re-run missing agents only)` — reuse `$RUN_DIR`, skip completed agents, spawn only missing ones, proceed to Phase 5 with the full set
+- `Start fresh` — create a new timestamped `$RUN_DIR`, run Phase 1 anew
+- `Show me what completed first` — print a one-liner per completed agent with a 2-line preview, then re-ask
+
+The silent-skip-without-asking anti-pattern was removed in v2.1 because it
+surprised users who expected a fresh run and got a partial one. Always ask.
+
+**Explicit resume (user-initiated):** If the user explicitly says "resume the
+last swarm run" or "resume from <timestamp>", skip the detection+ask and go
+straight to resume: set `$RUN_DIR` to the matching directory, skip Phase 1/2,
+re-read the brief, and proceed to Phase 4 with the skip-if-complete-marker
+logic above. No need to re-confirm — the user already told you.
+
+### Dry-run handling
+
+If the invocation is a **dry run** (see Modes section), DO NOT spawn agents.
+Instead, construct the full prompt each agent would receive and write it to
+`$RUN_DIR/dry-run.md` with this structure:
+
+```markdown
+# Dry Run Preview — [Project Name]
+
+Run directory: $RUN_DIR
+Model: <sonnet | opus>
+Agents: <count>
+
+---
+
+## Agent 1: <name>
+
+**Focus areas:** <list from brief>
+**Output file:** $RUN_DIR/<subdir>/<slug>.md
+
+**Full prompt:**
+
+```
+<the exact prompt that would be passed to the Agent tool>
+```
+
+---
+
+## Agent 2: <name>
+...
+```
+
+After writing, tell the user: *"Dry run complete. Previews at
+`$RUN_DIR/dry-run.md`. Say 'run it for real' to proceed with these exact
+selections."* Do NOT proceed to Phase 5. Stop and wait for user input.
+
+If the user later says "run it for real" or "go", re-enter Phase 4 *without*
+regenerating phases 1-3 — `$RUN_DIR` already has everything needed. Drop the
+dry-run flag and proceed normally.
+
+### Normal (full / quick) deployment
 
 Spawn all selected agents simultaneously using the `Agent` tool — all in one
 response, so they run in parallel. Sub-agents are the only run mode; team mode
@@ -247,6 +456,13 @@ Each agent prompt must include:
 2. The agent's specific focus areas from Phase 2
 3. The output file path for that agent's report
 4. Reporting instructions from `references/agent-roster.md`
+5. **Completion marker instruction:** the agent MUST end its report with the
+   literal line `<!-- SWARM_AGENT_COMPLETE -->` as its final non-empty line.
+   This is a contract between the agent and the resume detection in Phase 4 +
+   the synthesis status tracking in Phase 5 — it's how the skill distinguishes
+   "agent finished its report" from "agent crashed and wrote a partial file."
+   Agent prompts should include: *"End your report with the literal line
+   `<!-- SWARM_AGENT_COMPLETE -->` on its own line to signal completion."*
 
 Output paths (all inside the timestamped `$RUN_DIR` from phase 1):
 ```
@@ -266,8 +482,78 @@ Wait for all agents to complete before Phase 5.
 ## Phase 5 — Synthesis + Swarm.Sync.md
 
 After all agents finish, **do the synthesis yourself in the parent context — do not delegate to a sub-agent**. Sub-agents cannot spawn sub-agents, and you need access to all the agent output files at once. Read every agent output file plus the synthesis template, then write:
-1. `$RUN_DIR/synthesis.md` — the synthesis report for this run
-2. `.claude/swarm-review/Swarm.Sync.md` — persistent file updated each run (top-level, NOT inside `$RUN_DIR`)
+
+1. `$RUN_DIR/synthesis.md` — human-readable synthesis report for this run
+2. `$RUN_DIR/synthesis.json` — machine-readable structured findings (see schema below)
+3. `.claude/swarm-review/Swarm.Sync.md` — persistent file updated each run (top-level, NOT inside `$RUN_DIR`)
+
+### synthesis.json schema
+
+Write a structured JSON version alongside the markdown synthesis so findings
+can be piped into CI gates, ticketing systems, or custom dashboards. The
+markdown report is the human-facing version; the JSON is the pipeable one.
+
+```json
+{
+  "run_id": "20260414-1530",
+  "project": "CampusNova",
+  "project_size": "medium",
+  "started_at": "2026-04-14T15:30:00Z",
+  "completed_at": "2026-04-14T15:42:00Z",
+  "synthesis_completed_at": "2026-04-14T15:43:12Z",
+  "synthesis_status": "complete",
+  "model": "sonnet",
+  "mode": "full",
+  "agents_requested": ["freshman-week-1", "senior-managing-notes", "security", "performance"],
+  "agents_completed": ["freshman-week-1", "senior-managing-notes", "security", "performance"],
+  "agents_failed": [],
+  "total_findings": 27,
+  "top_actions": [
+    {
+      "rank": 1,
+      "finding": "Onboarding asks for 8 fields before showing any value",
+      "type": "UX",
+      "severity": "high",
+      "files": ["src/components/Onboarding.tsx"],
+      "agents": ["freshman-week-1"],
+      "why_this_rank": "First-run friction, quoted verbatim by freshman persona as 'I almost bounced'"
+    }
+  ],
+  "findings_by_agent": {
+    "freshman-week-1": [
+      {
+        "finding": "...",
+        "severity": "high",
+        "files": ["..."],
+        "line_refs": ["src/components/Onboarding.tsx:42"]
+      }
+    ],
+    "security": [
+      {
+        "finding": "...",
+        "severity": "medium",
+        "files": ["..."],
+        "line_refs": []
+      }
+    ]
+  }
+}
+```
+
+**Severity levels:** `"critical" | "high" | "medium" | "low"` (be consistent — pick from exactly these four, don't invent new ones).
+
+**Type values:** `"UX" | "Security" | "Performance" | "Accessibility" | "Code Quality" | "Standards" | "Mobile" | "Product"` (match the agent categories).
+
+**`synthesis_status` values:**
+- `"complete"` — all requested agents finished successfully, all findings included
+- `"partial_failure"` — one or more agents failed (listed in `agents_failed`), synthesis proceeded with the successful subset
+- `"incomplete"` — synthesis ran on a partial result set (e.g., user interrupted, sync crashed mid-write); CI gates should treat this as unreliable
+
+**CI-gate usage:** Automated pipelines consuming `synthesis.json` should always check `synthesis_status == "complete"` before acting on findings. A `"partial_failure"` run may legitimately have 0 findings for a category that the failed agent would have caught — treating it as authoritative risks false negatives.
+
+**Slug consistency rule:** Every slug in `agents_requested` / `agents_completed` / `agents_failed` must exactly match the keys of `findings_by_agent` and the values in each top_action's `agents` array. A CI gate expecting `"security"` must not have to handle both `"security"` and `"security-specialist"` — pick one canonical slug per agent and use it everywhere in the JSON.
+
+The JSON should contain every finding from every successful agent — not just the top 10. The markdown version can be selective for human readability, but the JSON is authoritative and complete.
 
 **Swarm.Sync.md format:**
 
@@ -334,18 +620,27 @@ After the user responds:
 Confirm all file paths to the user:
 
 ```
-Review complete. [N] agents ran. Files:
+Review complete. [N] agents ran ([mode]). Files:
 
 Run directory:   $RUN_DIR/
 Personas:        $RUN_DIR/personas/[persona-slug].md (for each)
 Specialists:     $RUN_DIR/specialists/[specialist-name].md (for each)
-Synthesis:       $RUN_DIR/synthesis.md
+Synthesis:       $RUN_DIR/synthesis.md     (human-readable)
+Structured:      $RUN_DIR/synthesis.json   (machine-readable, pipeable to CI)
 Swarm Sync:      .claude/swarm-review/Swarm.Sync.md  (persistent across runs)
+
+Estimated spend: $[actual from cost formula]
 
 Review the findings and tell me what to implement, change, remove, or defer.
 ```
 
-Give a brief verbal summary of the top 5 findings.
+Give a brief verbal summary of the top 3-5 findings. In quick mode, keep the
+summary to top 3; in full mode, top 5. Don't bury the lede — lead with the
+highest-severity finding regardless of category.
+
+**If this was a dry run**, the output is different — see the dry-run handling
+in Phase 4. Don't print the "Review complete" block, print the "Dry run
+complete" block instead.
 
 ---
 
